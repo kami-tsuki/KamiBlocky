@@ -16,6 +16,9 @@ commands:
   countdown:
     description: Starts a countdown timer.
     usage: /countdown <seconds>
+  timer:
+    description: Starts a timer.
+    usage: /timer <seconds>
 permissions:
   kamiblocky.admin:
     description: Admin permissions for KamiBlocky.

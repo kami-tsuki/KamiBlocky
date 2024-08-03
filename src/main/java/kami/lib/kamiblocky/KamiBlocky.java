@@ -1,9 +1,6 @@
 package kami.lib.kamiblocky;
 
-import kami.lib.kamiblocky.commands.CountdownCommand;
-import kami.lib.kamiblocky.commands.PartyAdminCommand;
-import kami.lib.kamiblocky.commands.PartyCommand;
-import kami.lib.kamiblocky.commands.ToggleCommand;
+import kami.lib.kamiblocky.commands.*;
 import kami.lib.kamiblocky.commands.completer.ToggleTabCompleter;
 import kami.lib.kamiblocky.party.PartyManager;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -35,6 +32,7 @@ public final class KamiBlocky extends JavaPlugin {
         this.getCommand("toggle").setExecutor(new ToggleCommand(this));
 
         this.getCommand("countdown").setExecutor(new CountdownCommand());
+        this.getCommand("timer").setExecutor(new TimerCommand());
         this.getCommand("toggle").setTabCompleter(new ToggleTabCompleter());
 
         initGameModes();
