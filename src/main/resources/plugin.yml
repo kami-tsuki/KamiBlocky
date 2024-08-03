@@ -1,0 +1,22 @@
+name: KamiBlocky
+version: '${version}'
+main: kami.lib.kamiblocky.KamiBlocky
+api-version: '1.21'
+
+commands:
+  toggle:
+    description: Toggle a feature on or off
+    usage: /toggle <feature>
+  party:
+    description: Party management commands.
+    usage: /party <command>
+  partyadmin:
+    description: Admin party management commands.
+    usage: /partyadmin <command>
+  countdown:
+    description: Starts a countdown timer.
+    usage: /countdown <seconds>
+permissions:
+  kamiblocky.admin:
+    description: Admin permissions for KamiBlocky.
+    default: op
