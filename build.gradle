@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'kami.lib'
-version = '1.0.21-SNAPSHOT'
+version = '1.0.62-SNAPSHOT'
 
 repositories {
     mavenCentral()

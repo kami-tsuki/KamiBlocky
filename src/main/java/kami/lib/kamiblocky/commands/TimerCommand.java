@@ -6,6 +6,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.jetbrains.annotations.NotNull;
@@ -15,12 +16,14 @@ import java.util.stream.Collectors;
 
 public class TimerCommand implements CommandExecutor, TabCompleter {
 
-    private final Map<String, TimerTask> activeTimers = new HashMap<>();
+    public final Map<String, TimerTask> activeTimers = new HashMap<>();
+    private final Map<String, TimerCondition> timerConditions = new HashMap<>();
+    public final Map<String, TimerConfig> timerConfigs = new HashMap<>();
 
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
         if (args.length < 1) {
-            sender.sendMessage(ChatColor.RED + "Usage: /timer <start|pause|continue|stop|reset|help> [player...] [options...]");
+            sender.sendMessage(ChatColor.RED + "Usage: /timer <start|pause|continue|stop|reset|help|configure> [options...]");
             return true;
         }
 
@@ -48,31 +51,33 @@ public class TimerCommand implements CommandExecutor, TabCompleter {
                 boolean italic = false;
                 boolean strikethrough = false;
                 boolean magic = false;
-
-                // Process optional color and formatting
                 for (int i = targetPlayers.isEmpty() ? 1 : 2; i < args.length; i++) {
                     String option = args[i].toLowerCase();
-                    if (option.equals("bold")) {
-                        bold = true;
-                    } else if (option.equals("underline")) {
-                        underline = true;
-                    } else if (option.equals("italic")) {
-                        italic = true;
-                    } else if (option.equals("strikethrough")) {
-                        strikethrough = true;
-                    } else if (option.equals("magic")) {
-                        magic = true;
-                    } else {
-                        try {
-                            color = ChatColor.valueOf(option.toUpperCase());
-                        } catch (IllegalArgumentException e) {
-                            sender.sendMessage(ChatColor.RED + "Unknown color: " + option);
-                            return true;
+                    switch (option) {
+                        case "bold" -> bold = true;
+                        case "underline" -> underline = true;
+                        case "italic" -> italic = true;
+                        case "strikethrough" -> strikethrough = true;
+                        case "magic" -> magic = true;
+                        default -> {
+                            try {
+                                color = ChatColor.valueOf(option.toUpperCase());
+                            } catch (IllegalArgumentException e) {
+                                sender.sendMessage(ChatColor.RED + "Unknown color: " + option);
+                                return true;
+                            }
                         }
                     }
                 }
 
                 startTimer(sender, targetPlayers, color, bold, underline, italic, strikethrough, magic);
+                break;
+            case "configure":
+                if (args.length < 3) {
+                    sender.sendMessage(ChatColor.RED + "Usage: /timer configure <action> <condition> [options...]");
+                    return true;
+                }
+                handleConfigure(sender, args);
                 break;
             default:
                 sender.sendMessage(ChatColor.RED + "Unknown action. Use /timer help for usage.");
@@ -129,12 +134,62 @@ public class TimerCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleConfigure(CommandSender sender, String[] args) {
+        if (args.length < 4) {
+            sender.sendMessage(ChatColor.RED + "Usage: /timer configure <action> <condition> [options...]");
+            return;
+        }
+
+        String action = args[1].toLowerCase();
+        String condition = args[2].toLowerCase();
+
+        if (!Arrays.asList("pause", "restart", "stop").contains(action)) {
+            sender.sendMessage(ChatColor.RED + "Unknown action. Valid actions are: pause, restart, stop.");
+            return;
+        }
+
+        TimerCondition timerCondition;
+        try {
+            timerCondition = TimerCondition.valueOf(condition.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            sender.sendMessage(ChatColor.RED + "Unknown condition. Valid conditions are: onKill, onAchievement, onDead.");
+            return;
+        }
+
+        TimerConfig config = new TimerConfig(timerCondition);
+        String type = args[3].toLowerCase();
+        if (timerCondition == TimerCondition.ON_KILL || timerCondition == TimerCondition.ON_ACHIEVEMENT) {
+            config.setType(type);
+        }
+        if (args.length > 4) {
+            String count = args[4];
+            try {
+                config.setCount(Integer.parseInt(count));
+            } catch (NumberFormatException e) {
+                sender.sendMessage(ChatColor.RED + "Invalid count: " + count);
+                return;
+            }
+        }
+        if (args.length > 5) {
+            String scope = args[5].toLowerCase();
+            if (scope.equals("perplayer") || scope.equals("allplayers")) {
+                config.setScope(scope);
+            } else {
+                sender.sendMessage(ChatColor.RED + "Invalid scope: " + scope);
+                return;
+            }
+        }
+
+        timerConfigs.put(action, config);
+        sender.sendMessage(ChatColor.GREEN + "Timer condition configured: " + action + " when " + condition + " with options: " + config);
+    }
+
     private void showHelp(CommandSender sender) {
-        ChatColor color = ChatColor.YELLOW;
-        sender.sendMessage(color + "Usage: /timer <start|pause|continue|stop|reset|help> [player...] [options...]");
-        sender.sendMessage(color + "Actions: start, pause, continue, stop, reset, help");
+        var color = ChatColor.YELLOW;
+        sender.sendMessage(color + "Usage: /timer <start|pause|continue|stop|reset|help|configure> [player...] [options...]");
+        sender.sendMessage(color + "Actions: start, pause, continue, stop, reset, help, configure");
         sender.sendMessage(color + "Players: Specify player names or use @a for all online players.");
-        sender.sendMessage(color + "Options: Specify color (e.g., red, blue) and formatting (bold, underline)");
+        sender.sendMessage(color + "Options: Specify color (e.g., red, blue) and formatting (bold, underline, italic, strikethrough, magic)");
         sender.sendMessage(color + "Examples:");
         sender.sendMessage(color + "/timer start @a bold underline pink");
         sender.sendMessage(color + "/timer start @a bold purple");
@@ -143,6 +198,10 @@ public class TimerCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(color + "/timer pause @player2");
         sender.sendMessage(color + "/timer continue @player1");
         sender.sendMessage(color + "/timer reset @player1");
+        sender.sendMessage(color + "/timer configure pause onKill warden 5 perPlayer");
+        sender.sendMessage(color + "/timer configure pause onAchievement 5 perPlayer");
+        sender.sendMessage(color + "/timer configure pause onKill Player <name>");
+        sender.sendMessage(color + "/timer configure pause onDead <player>");
     }
 
     private List<Player> getTargetPlayers(String[] args, int startIndex) {
@@ -169,6 +228,7 @@ public class TimerCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         List<String> suggestions = new ArrayList<>();
+
         if (args.length == 1) {
             suggestions.add("start");
             suggestions.add("pause");
@@ -176,24 +236,94 @@ public class TimerCommand implements CommandExecutor, TabCompleter {
             suggestions.add("stop");
             suggestions.add("reset");
             suggestions.add("help");
-        } else if (args.length > 1 && Arrays.asList("start", "pause", "continue", "stop", "reset").contains(args[0])) {
-            suggestions.add("@a");
-            suggestions.add("bold");
-            suggestions.add("underline");
-            suggestions.add("italic");
-            suggestions.add("strikethrough");
-            suggestions.add("magic");
-            for (ChatColor color : ChatColor.values()) {
-                suggestions.add(color.name().toLowerCase());
+            suggestions.add("configure");
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("configure")) {
+            suggestions.add("pause");
+            suggestions.add("restart");
+            suggestions.add("stop");
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("configure")) {
+            String action = args[1].toLowerCase();
+            if (action.equals("pause") || action.equals("restart") || action.equals("stop")) {
+                suggestions.add("onKill");
+                suggestions.add("onAchievement");
+                suggestions.add("onDead");
             }
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                suggestions.add(player.getName());
+        } else if (args.length == 4 && args[0].equalsIgnoreCase("configure")) {
+            String condition = args[2].toLowerCase();
+            switch (condition) {
+                case "onKill" -> {
+                    suggestions.add("player");
+                    for (EntityType entity : EntityType.values()) {
+                        suggestions.add(entity.name());
+                    }
+                }
+                case "onAchievement" -> {
+                    // Optionally, add achievement-related suggestions here.
+                }
+                case "onDead" -> {
+                    suggestions.add("@a");
+                    for (Player player : Bukkit.getOnlinePlayers()) {
+                        suggestions.add(player.getName());
+                    }
+                }
+            }
+        } else if (args.length == 5 && args[0].equalsIgnoreCase("configure")) {
+            String condition = args[2].toLowerCase();
+            if (condition.equals("onKill") || condition.equals("onAchievement")) {
+                suggestions.add("perPlayer");
+                suggestions.add("allPlayers");
             }
         }
-        return suggestions;
+
+        return suggestions.stream().distinct().collect(Collectors.toList());
     }
 
-    private static class TimerTask extends BukkitRunnable {
+    private enum TimerCondition {
+        ON_KILL, ON_ACHIEVEMENT, ON_DEAD
+    }
+
+    public static class TimerConfig {
+        private final TimerCondition condition;
+        private String type;
+        private int count = -1;
+        private String scope;
+
+        public TimerConfig(TimerCondition condition) {
+            this.condition = condition;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public void setCount(int count) {
+            this.count = count;
+        }
+
+        public void setScope(String scope) {
+            this.scope = scope;
+        }
+
+        @Override
+        public String toString() {
+            return "TimerConfig{" +
+                    "condition=" + condition +
+                    ", type='" + type + '\'' +
+                    ", count=" + count +
+                    ", scope='" + scope + '\'' +
+                    '}';
+        }
+
+        public Object getScope() {
+            return scope;
+        }
+
+        public String getType() {
+            return type;
+        }
+    }
+
+    public static class TimerTask extends BukkitRunnable {
         private final Player player;
         private final ChatColor color;
         private final boolean bold;

@@ -19,6 +19,13 @@ commands:
   timer:
     description: Starts a timer.
     usage: /timer <seconds>
+  explosion:
+    description: Explode a player.
+    usage: /explosion <x> <y> <z> <seconds> <radius> <core temp> <drop chance> <nuke>
+  heat:
+    description: Heat a player.
+    usage: /heat <x> <y> <z> <temperature>
+
 permissions:
   kamiblocky.admin:
     description: Admin permissions for KamiBlocky.
